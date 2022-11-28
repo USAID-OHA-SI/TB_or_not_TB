@@ -15,7 +15,7 @@
 # GLOBAL VARIABLES --------------------------------------------------------
   
   #set up folders if you havent
-  # folder_setup()
+  # si_setup()
 
   # SI specific paths/functions  
     load_secrets()
