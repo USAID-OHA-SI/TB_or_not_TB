@@ -79,7 +79,7 @@
            standardizeddisaggregate == "Specimen Sent/HIVStatus",
            funding_agency == "USAID") %>% 
     group_by(fiscal_year, indicator,
-             funding_agency) %>% 
+             standardizeddisaggregate) %>% 
     summarise(across(starts_with("qtr"), sum, na.rm = T), .groups = "drop") 
   
   #get specimen return
