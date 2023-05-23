@@ -10,27 +10,42 @@
   library(glamr)
   library(tidyverse)
   library(gophr)
+  library(grabr)
+  library(glue)
   
 
 # GLOBAL VARIABLES --------------------------------------------------------
-  
-  #set up folders if you havent
-  # si_setup()
 
   # SI specific paths/functions  
     load_secrets()
 
     ref_id <- "89ca5f1b"
+    
+    today <- lubridate::today()
+    
+    #establish Pano session
+    user <- pano_user()
+    pass <- pano_pwd()
+    
+    sess <- pano_session(username = user, password = pass)
 
 # IMPORT ------------------------------------------------------------------
+    
+    #download MSD from Pano using Pano API
+    pano_extract_msd(operatingunit = NULL,
+                     #version = "clean",
+                     fiscal_year = 2023,
+                     #quarter = 2,
+                     level = "ou",
+                     dest_path = si_path())
   
  df_msd <- si_path() %>%
-    return_latest("MER_Structured_Datasets_OU_IM_FY20-23") %>%
-    read_msd() %>% 
+    return_latest("MER_Structured_Datasets_OU_IM_FY21-23") %>%
+    read_psd() %>% 
     resolve_knownissues()
     
     
-write_tsv(df_msd, "Dataout/MER_Structured_Datasets_OU_IM_FY20-23_20221114_known_issues_resolved.txt", na = "")
+write_tsv(df_msd, glue("Dataout/MER_Structured_Datasets_OU_IM_FY21-23_{today}_known_issues_resolved.txt"), na = "")
 
 
 
