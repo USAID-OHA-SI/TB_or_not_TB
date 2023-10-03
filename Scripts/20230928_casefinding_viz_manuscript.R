@@ -51,7 +51,12 @@
   
   #bind dfs together
   df_msd <- df_msd %>% 
-    rbind(df_hist)
+    rbind(df_hist) %>% 
+    filter(indicatortype != "CS")
+  
+  df_msd %>% 
+   # resolve_knownissues() %>% 
+    count(indicatortype)
 
 # MUNGE -------------------------------------------------------------------
   
