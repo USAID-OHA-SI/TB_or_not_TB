@@ -90,25 +90,26 @@ df_cntry_clean <- df_country %>%
   tidy_data() %>% 
   mutate(table_name = "TB burden countries")
 
-#list of cols to remove from notifs df
-rm_cols <- c("new_sp", "new_sn", "new_su", "new_oth", "ret_rel", "ret_taf", "ret_tad", "ret_oth", "newret_oth",
-             "new_sp_m04", "new_sp_m514", "new_sp_m014", "new_sp_m1524", "new_sp_m2534","new_sp_m3544","new_sp_m4554",
-             "new_sp_m5564","new_sp_m65", "new_sp_mu","new_sp_f04","new_sp_f514","new_sp_f014","new_sp_f1524",
-             "new_sp_f2534","new_sp_f3544","new_sp_f4554","new_sp_f5564","new_sp_f65", "new_sp_fu","new_sn_m04",
-             "new_sn_m514","new_sn_m014","new_sn_m1524", "new_sn_m2534","new_sn_m3544", "new_sn_m4554","new_sn_m5564","new_sn_m65",
-             "new_sn_m15plus", "new_sn_mu", "new_sn_f04", "new_sn_f514","new_sn_f014", "new_sn_f1524", "new_sn_f2534", "new_sn_f3544",
-             "new_sn_f4554","new_sn_f5564", "new_sn_f65", "new_sn_f15plus", "new_sn_fu", "new_sn_sexunk04", "new_sn_sexunk514",
-             "new_sn_sexunk014","new_sn_sexunk15plus","new_ep_m04","new_ep_m514","new_ep_m014", "new_ep_m1524","new_ep_m2534","new_ep_m3544",
-             "new_ep_m4554","new_ep_m5564", "new_ep_m65","new_ep_m15plus","new_ep_mu","new_ep_f04","new_ep_f514", "new_ep_f014","new_ep_f1524",
-             "new_ep_f2534","new_ep_f3544","new_ep_f4554", "new_ep_f5564","new_ep_f65","new_ep_f15plus",
-             "mdr_tx_adverse_events", "hivtest", "hivtest_pos", "hiv_cpt", "hiv_art", "hiv_tbscr", "hiv_reg",
-             "new_ep_fu", "new_ep_sexunk04", "new_ep_sexunk514","new_ep_sexunk014","new_ep_sexunk15plus", "new_ep_sexunkageunk",
-             "newrel_f514", "unconf_mdr_tx", "conf_mdr_tx")
+# #list of cols to remove from notifs df
+# rm_cols <- c("new_sp", "new_sn", "new_su", "new_oth", "ret_rel", "ret_taf", "ret_tad", "ret_oth", "newret_oth",
+#              "new_sp_m04", "new_sp_m514", "new_sp_m014", "new_sp_m1524", "new_sp_m2534","new_sp_m3544","new_sp_m4554",
+#              "new_sp_m5564","new_sp_m65", "new_sp_mu","new_sp_f04","new_sp_f514","new_sp_f014","new_sp_f1524",
+#              "new_sp_f2534","new_sp_f3544","new_sp_f4554","new_sp_f5564","new_sp_f65", "new_sp_fu","new_sn_m04",
+#              "new_sn_m514","new_sn_m014","new_sn_m1524", "new_sn_m2534","new_sn_m3544", "new_sn_m4554","new_sn_m5564","new_sn_m65",
+#              "new_sn_m15plus", "new_sn_mu", "new_sn_f04", "new_sn_f514","new_sn_f014", "new_sn_f1524", "new_sn_f2534", "new_sn_f3544",
+#              "new_sn_f4554","new_sn_f5564", "new_sn_f65", "new_sn_f15plus", "new_sn_fu", "new_sn_sexunk04", "new_sn_sexunk514",
+#              "new_sn_sexunk014","new_sn_sexunk15plus","new_ep_m04","new_ep_m514","new_ep_m014", "new_ep_m1524","new_ep_m2534","new_ep_m3544",
+#              "new_ep_m4554","new_ep_m5564", "new_ep_m65","new_ep_m15plus","new_ep_mu","new_ep_f04","new_ep_f514", "new_ep_f014","new_ep_f1524",
+#              "new_ep_f2534","new_ep_f3544","new_ep_f4554", "new_ep_f5564","new_ep_f65","new_ep_f15plus",
+#              "mdr_tx_adverse_events", "hivtest", "hivtest_pos", "hiv_cpt", "hiv_art", "hiv_tbscr", "hiv_reg",
+#              "new_ep_fu", "new_ep_sexunk04", "new_ep_sexunk514","new_ep_sexunk014","new_ep_sexunk15plus", "new_ep_sexunkageunk",
+#              "newrel_f514", "unconf_mdr_tx", "conf_mdr_tx")
 
 #apply functions and remove cols
 df_notif_clean <- df_notif %>% 
   rename_countries() %>% 
-  select(-c(all_of(rm_cols))) %>% 
+ # select(-c(all_of(rm_cols))) %>% 
+  select(country, iso2, iso3, iso_numeric, g_whoregion, year, newrel_hivpos, newrel_hivpos_014) %>% 
   tidy_data() %>% 
   mutate(table_name = "TB notifications")
 
