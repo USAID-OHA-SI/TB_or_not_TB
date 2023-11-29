@@ -3,7 +3,7 @@
 # REF ID:   89ca5f1b 
 # LICENSE:  MIT
 # DATE:     2022-11-28
-# UPDATED: 
+# UPDATED:  2023-11-29
 
 # DEPENDENCIES ------------------------------------------------------------
   
@@ -40,12 +40,17 @@
                      dest_path = si_path())
   
  df_msd <- si_path() %>%
-    return_latest("MER_Structured_Datasets_OU_IM_FY21-23") %>%
+    return_latest("MER_Structured_Datasets_OU_IM_FY21-24") %>%
     read_psd() %>% 
     resolve_knownissues()
     
+ df_msd_no_nga <- si_path() %>%
+   return_latest("MER_Structured_Datasets_OU_IM_FY21-24") %>%
+   read_psd() %>% 
+   resolve_knownissues() %>% 
+   filter(operatingunit != "Nigeria")
     
-write_tsv(df_msd, glue("Dataout/MER_Structured_Datasets_OU_IM_FY21-23_{today}_known_issues_resolved.txt"), na = "")
-
+write_tsv(df_msd, glue("Dataout/MER_Structured_Datasets_OU_IM_FY21-24_{today}_known_issues_resolved.txt"), na = "")
+write_tsv(df_msd_no_nga, glue("Dataout/MER_Structured_Datasets_OU_IM_FY21-24_{today}_known_issues_resolved_NO_NIGERIA.txt"), na = "")
 
 
