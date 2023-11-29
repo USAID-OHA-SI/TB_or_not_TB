@@ -62,7 +62,15 @@ rename_countries <- function(df) {
                                country == "Papua New Guinea" ~ "PNG",
                                country == "United Republic of Tanzania" ~ "Tanzania",
                                country == "Viet Nam" ~ "Vietnam",
+                               country == "Venezuela (Bolivarian Republic of)" ~ "Venezuela",
                                country == "Myanmar" ~ "Burma",
+                               country == "Türkiye" ~ "Turkey",
+                               country == "Curaçao" ~ "Curazao",
+                               country == "Czechia" ~ "Czech Republic",
+                               country == "Bolivia (Plurinational State of)" ~ "Bolivia",
+                               country == "Democratic People Republic of Korea"~ "Democratic People's Republic of Korea",
+                               country == "Netherlands (Kingdom of the)" ~ "Netherlands",
+                               country == "United Kingdom of Great Britain and Northern Ireland" ~ "United Kingdom",
                                TRUE ~ country))
   
   return(df_rename)
@@ -78,6 +86,7 @@ tidy_data <- function(df) {
    tidyr::pivot_longer(where(is.double),
                        names_to = "indicator") %>% 
     select(country,iso3, g_whoregion, year, indicator, value)
+   
  
  return(df_tidy)
 }
@@ -115,6 +124,7 @@ df_notif_clean <- df_notif %>%
 
 
 df_age_sex_clean <- df_age_sex %>% 
+  rename_countries() %>% 
   filter(age_group == "0-14",
          sex == "a", 
          risk_factor == "all") %>% 
