@@ -41,7 +41,7 @@
                      "Togo", "Ukraine", "Vietnam", "Kazakhstan", "Kyrgyzstan", "Tajikistan", "Senegal",
                      "Brazil", "Burma", "Cambodia", "Dominican Republic", "India", "Indonesia", "Jamaica",
                      "Laos","Mali", "Nepal", "Nicaragua", "Papua New Guinea", "Peru", "Philippines", "Thailand",
-                     "Trinidad and Tobago", "Guyana", "Barbados", "China", "Suriname")
+                     "Trinidad and Tobago", "Guyana", "Barbados", "China", "Suriname", "Nigeria", "Tanzania")
 
   #rounding function
   clean_number <- function(x, digits = 0){
@@ -56,6 +56,10 @@
   df_msd <- read_psd(filepath)
   
   df_old <- read_psd(old_filepath)
+  
+  si_path() %>% 
+    return_latest("MER_Structured_Datasets_OU_IM_FY15-20_20231215_v2_1.zip") %>% 
+    read_psd()
   
   df_msd <- df_msd %>% 
     bind_rows(df_old)
@@ -80,23 +84,40 @@
            fiscal_year %in% c(2019, 2020, 2021, 2022, 2023),
            modality == "TBClinic"
            ) %>% 
-    group_by(fiscal_year, indicator, country, modality) %>% 
-    summarise(across(starts_with("cumulative"), sum, na.rm = T), .groups = "drop") %>% count(country) %>% pull(country)
-    count(fiscal_year, country) %>% View()
+    group_by(fiscal_year, country, modality) %>% 
+    summarise(across(starts_with("qtr"), sum, na.rm = T), .groups = "drop") %>%
+    reshape_msd() %>% 
+    filter(value != 0) %>% 
+    #count(country) %>% pull(country)
+    count(period, country) %>% 
+    arrange(country) %>%  
+    group_by(country) %>% 
+    mutate(sum = sum(n)) %>% 
+    ungroup() %>% 
+    filter(sum ==20) %>% 
+    distinct(country)
     
     
     #check to include only countries that report TB_STAT in all FY21-FY23
     df_msd %>% 
       filter(indicator %in% c("TB_STAT"),
-             standardizeddisaggregate %in% c("Age/Sex/KnownNewPosNeg"),
+             numeratordenom == "D",
+             standardizeddisaggregate %in% c("Age/Sex"),
              fiscal_year %in% c(2019, 2020, 2021, 2022, 2023),
       ) %>% 
       group_by(fiscal_year, indicator, country) %>% 
-      summarise(across(starts_with("cumulative"), sum, na.rm = T), .groups = "drop") %>% count(country) %>% pull(country)
-      count(fiscal_year, country)
-    #reshape_msd() %>% 
-    filter(cumulative == 0) %>% 
-      count(fiscal_year,country, indicator) %>% View()
+      summarise(across(starts_with("qtr"), sum, na.rm = T), .groups = "drop") %>%
+      reshape_msd() %>% 
+      filter(value != 0) %>% 
+      #count(country) %>% pull(country)
+      count(period, country) %>% 
+      arrange(country) %>% 
+      group_by(country) %>% 
+      mutate(sum = sum(n)) %>% 
+      ungroup() %>% 
+      filter(sum ==20) %>% 
+      distinct(country)
+  
     
   #check TB_ART countries 
     df_msd %>% 
@@ -108,21 +129,45 @@
       group_by(fiscal_year, indicator, country) %>% 
       summarise(across(starts_with("cumulative"), sum, na.rm = T), .groups = "drop") %>%
       #count(country) %>% pull(country)
-    count(fiscal_year, country)
-    #reshape_msd() %>% 
-    filter(cumulative == 0) %>% 
-      count(fiscal_year,country, indicator) %>% View()
+    count(fiscal_year, country) %>% 
+      arrange(country) %>% 
+      group_by(country) %>% 
+      mutate(sum = sum(n)) %>% 
+      ungroup() %>% 
+      filter(sum ==5) %>% 
+      distinct(country)
+
     
   # MUNGE -------------------------------------------------------------------
     
-  #calculate TB_STAT_POS  
+    
+    df_msd %>% 
+      filter(indicator %in% c("HTS_TST", "HTS_TST_POS"),
+             country %ni% exclude_cntry,
+             fiscal_year %in% c(2019,2020, 2021, 2022,2023),
+             standardizeddisaggregate == "Modality/Age/Sex/Result") %>% 
+      count(modality)
+    
+  #calculate TB_STAT known status 
     df_msd %>% 
       filter(indicator %in% c("TB_STAT"),
-             fiscal_year != 2024,
-             standardizeddisaggregate == "Age/Sex/KnownNewPosNeg"
+             fiscal_year %in% c(2019,2020, 2021, 2022,2023),
+             country %in% include_cntry,
+             standardizeddisaggregate %in% c("Age/Sex/KnownNewPosNeg", "Age/Sex") 
              ) %>% 
-      #count(standardizeddisaggregate, numeratordenom)
-      # count(country)
+      group_by(fiscal_year, indicator, numeratordenom) %>% 
+      summarise(across(starts_with("cumulative"), sum, na.rm = T), .groups = "drop") %>% 
+      pivot_wider(names_from = "numeratordenom", values_from = "cumulative") %>% 
+      mutate(pct_known_status = `N` / `D`)
+    
+    
+    #calculate TB_STAT_POS  
+    df_msd %>% 
+      filter(indicator %in% c("TB_STAT"),
+             fiscal_year %in% c(2019,2020, 2021, 2022,2023),
+             country %in% include_cntry,
+             standardizeddisaggregate %in% c("Age/Sex/KnownNewPosNeg") 
+      ) %>% 
       group_by(fiscal_year, indicator, numeratordenom, statushiv) %>% 
       summarise(across(starts_with("cumulative"), sum, na.rm = T), .groups = "drop") %>% 
       #  reshape_msd() %>% 
@@ -130,18 +175,88 @@
       mutate(total = `Negative` + `Positive`) %>% 
       mutate(tb_stat_pos = `Positive`/total)
     
+  # TB_STAT_D by gender
+    
+    df_msd %>% 
+      filter(indicator %in% c("TB_STAT"),
+             fiscal_year %in% c(2019,2020, 2021, 2022,2023),
+             country %in% include_cntry,
+             standardizeddisaggregate %in% c("Age/Sex/KnownNewPosNeg", "Age/Sex") 
+      ) %>% 
+      group_by(indicator, numeratordenom, sex) %>% 
+      summarise(across(starts_with("cumulative"), sum, na.rm = T), .groups = "drop") %>% 
+      pivot_wider(names_from = "sex", values_from = "cumulative") %>% 
+      mutate(total = Female + Male) %>% 
+      pivot_longer(cols = c("Female", "Male"), names_to = "sex") %>% 
+      mutate(share = value / total)
+    
+    
+  #TB_STAT_POS by gender
+    df_msd %>% 
+      filter(indicator %in% c("TB_STAT"),
+             fiscal_year %in% c(2019,2020, 2021, 2022,2023),
+             country %in% include_cntry,
+             standardizeddisaggregate %in% c("Age/Sex/KnownNewPosNeg") 
+      ) %>% 
+      group_by(indicator, numeratordenom, statushiv, sex) %>% 
+      summarise(across(starts_with("cumulative"), sum, na.rm = T), .groups = "drop") %>% 
+      pivot_wider(names_from = "statushiv", values_from = "cumulative") %>% 
+      mutate(total = `Negative` + `Positive`) %>% 
+      mutate(tb_stat_pos = `Positive`/total)
+  
+    #coinfection by age
+    df_msd %>% 
+      filter(indicator %in% c("TB_STAT"),
+             fiscal_year %in% c(2019,2020, 2021, 2022,2023),
+             country %in% include_cntry,
+             standardizeddisaggregate %in% c("Age/Sex/KnownNewPosNeg") 
+      ) %>% 
+      group_by(indicator, numeratordenom, statushiv, ageasentered) %>% 
+      summarise(across(starts_with("cumulative"), sum, na.rm = T), .groups = "drop") %>% 
+      pivot_wider(names_from = "statushiv", values_from = "cumulative") %>% 
+      mutate(total = `Negative` + `Positive`) %>% 
+      mutate(tb_stat_pos = `Positive`/total) %>% View()
+    
+    df_msd %>% 
+      filter(indicator %in% c("TB_STAT"),
+             fiscal_year %in% c(2019,2020, 2021, 2022,2023),
+             country %in% include_cntry,
+             standardizeddisaggregate %in% c("Age/Sex/KnownNewPosNeg") 
+      ) %>% 
+      group_by(fiscal_year, indicator, numeratordenom, statushiv, country) %>% 
+      summarise(across(starts_with("cumulative"), sum, na.rm = T), .groups = "drop") %>% 
+      pivot_wider(names_from = "statushiv", values_from = "cumulative") %>% 
+      mutate(total = `Negative` + `Positive`) %>% 
+      mutate(tb_stat_pos = `Positive`/total) %>% View()
+    
+    
 #calculate HTS tb modality positivity    
   df_hts_mod <-  df_msd %>% 
       filter(indicator %in% c("HTS_TST", "HTS_TST_POS"),
-             country %ni% exclude_cntry,
+             country %in% include_cntry,
+           #  country %ni% c("Nigeria", "Tanzania"),
              fiscal_year %in% c(2019,2020, 2021, 2022,2023),
              standardizeddisaggregate == "Modality/Age/Sex/Result") %>% 
     # count(country)
-      group_by(fiscal_year, indicator, target_modality_2024) %>% 
+      group_by(fiscal_year, indicator, modality) %>% 
       summarise(across(starts_with("cumulative"), sum, na.rm = T), .groups = "drop") %>% 
       #  reshape_msd() %>% 
       pivot_wider(names_from = "indicator", values_from = "cumulative") %>% 
       mutate(positivity = HTS_TST_POS/HTS_TST)
+  
+  df_msd %>% 
+    filter(indicator %in% c("HTS_TST", "HTS_TST_POS"),
+           country %ni% exclude_cntry,
+           country %ni% c("Nigeria", "Tanzania"),
+           fiscal_year %in% c(2019,2020, 2021, 2022,2023),
+           standardizeddisaggregate == "Modality/Age/Sex/Result") %>% 
+    # count(country)
+    group_by(fiscal_year, indicator, target_modality_2024) %>% 
+    summarise(across(starts_with("cumulative"), sum, na.rm = T), .groups = "drop") %>% 
+    #  reshape_msd() %>% 
+    pivot_wider(names_from = "indicator", values_from = "cumulative") %>% 
+    mutate(positivity = HTS_TST_POS/HTS_TST) %>% 
+    filter(target_modality_2024 == "Active Index")
       
   # VIZ -------------------------------------------------------------------
        
@@ -149,7 +264,7 @@
 df_hts_mod %>% 
  # ggplot(aes(fct_reorder(primepartner, HTS_TST, sum, .desc = TRUE), fct_reorder(modality, positivity), fill = positivity))
   ggplot(aes(x = fiscal_year, 
-             y = fct_reorder(target_modality_2024, positivity, sum, .desc = FALSE), 
+             y = fct_reorder(modality, positivity, sum, .desc = FALSE), 
              fill = positivity)) +
   geom_tile(color = "white", 
             size = 0.9) +
@@ -178,12 +293,12 @@ si_save("Images/02_modality_heatmap.png")
 nudge_space <- 0.125
 
 viz_bar <- df_hts_mod %>% 
-  filter(target_modality_2024 %in% c("Active Index", "TBClinic")) %>% 
+  filter(modality %in% c("Active Index", "TBClinic")) %>% 
   ggplot(aes(x = fiscal_year)) +
   geom_col(aes(y = HTS_TST), width = 0.75, fill = scooter) +
  # geom_col(aes(y = HTS_TST_POS), width = 0.75, position = position_nudge(x = nudge_space), fill = scooter_med) +
  # geom_col(aes(y = `Specimen Return`), width = 0.75, position = position_nudge(x = nudge_space*2), fill = golden_sand) +
-  facet_wrap(~target_modality_2024) +
+  facet_wrap(~modality) +
   si_style_ygrid() +
   geom_text(aes(y = HTS_TST, label = clean_number(HTS_TST)), size = 12/.pt, hjust = 0,
             color = scooter,
@@ -202,13 +317,13 @@ viz_bar <- df_hts_mod %>%
 
 #positivity by modality
 viz_line <- df_hts_mod %>% 
-  filter(target_modality_2024 %in% c("Active Index", "TBClinic")) %>% 
-  ggplot(aes(fiscal_year, positivity, group = target_modality_2024, color = scooter, fill = scooter)) +
+  filter(modality %in% c("Active Index", "TBClinic")) %>% 
+  ggplot(aes(fiscal_year, positivity, group = modality, color = scooter, fill = scooter)) +
   geom_line(alpha = .4, size = .9, position = "identity") +
   geom_point(na.rm = TRUE) +
   geom_text(aes(label = percent(positivity, 1)), na.rm = TRUE,
             hjust = .5, vjust = -0.4,family = "Source Sans Pro") +
-  facet_wrap(~target_modality_2024) +
+  facet_wrap(~modality) +
   scale_color_identity() + 
   scale_fill_identity() +
   si_style_nolines() +
@@ -229,8 +344,8 @@ si_save("Graphics/01_ias_modality_hts.svg")
 
 #median val for TBClinic Positivity yield
 df_hts_mod %>% 
-  filter(target_modality_2024 %in% c("Active Index", "TBClinic")) %>% 
-  group_by(target_modality_2024) %>% 
+  filter(modality %in% c("Active Index", "TBClinic")) %>% 
+  group_by(modality) %>% 
   summarise(median_pos = median(positivity)) %>% 
   ungroup()
 
@@ -245,7 +360,7 @@ df_hts_mod %>%
 
 df_hts_mod_age <-  df_msd %>% 
   filter(indicator %in% c("HTS_TST", "HTS_TST_POS"),
-         country %ni% exclude_cntry,
+         country %in% include_cntry,
          target_modality_2024 %in% c("Active Index", "TBClinic"),
          fiscal_year %in% c(2019,2020, 2021, 2022, 2023),
          standardizeddisaggregate == "Modality/Age/Sex/Result") %>% 
