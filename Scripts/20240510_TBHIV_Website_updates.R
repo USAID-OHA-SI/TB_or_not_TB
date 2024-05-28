@@ -189,7 +189,7 @@ library(gtExtras)
    plot_layout(heights = c(1,2))
  
  si_save("Images/TBHIV Website/01_xpert_tb_screen.png")
- 
+ si_save("Graphics/TBHIV Website/01_xpert_tb_screen.svg")
     
 # TPT -----------------------------------------------------------------------
   
@@ -261,11 +261,12 @@ library(gtExtras)
        # subtitle = "Subtitle",
         caption = glue::glue("{metadata_msd$caption}")) +
    theme(plot.title = element_markdown(),
-         axis.text.x = element_blank(),
+      #   axis.text.x = element_blank(),
          axis.text.y = element_blank())
   
   
   si_save("Images/TBHIV Website/02_tpt_completion.png")
+  si_save("Graphics/TBHIV Website/02_tpt_completion.svg")
   
   
 # TB_STAT ----------------------------------------------------------------
@@ -362,6 +363,8 @@ library(gtExtras)
     plot_layout(heights = c(1,2))  
   
   si_save("Images/TBHIV Website/03_tb_stat.png")
+  si_save("Graphics/TBHIV Website/03_tb_stat.svg")
+  
   
   
   
