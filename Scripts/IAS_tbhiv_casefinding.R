@@ -28,10 +28,10 @@
 
   #store filepath
     old_filepath <- si_path() %>% return_latest("OU_IM_FY15")
-    filepath <- si_path() %>% return_latest("OU_IM_FY21")
+    filepath <- si_path() %>% return_latest("OU_IM_FY22")
 
   # Grab metadata
-    get_metadata(filepath) 
+    metadata <- get_metadata(filepath) 
   
   ref_id <- "8242685e"
   
@@ -43,6 +43,11 @@
                      "Laos","Mali", "Nepal", "Nicaragua", "Papua New Guinea", "Peru", "Philippines", "Thailand",
                      "Trinidad and Tobago", "Guyana", "Barbados", "China", "Suriname", "Nigeria", "Tanzania")
 
+  include_cntry <- c("Angola", "Botswana", "Burundi", "Cameroon", "Cote d'Ivoire",
+                     "Democratic Republic of the Congo", "Eswatini", "Ethiopia", "Haiti",
+                     "Kenya", "Lesotho", "Malawi", "Mozambique", "Namibia", "South Africa", "South Sudan",
+                     "Uganda", "Zambia", "Zimbabwe")
+  
   #rounding function
   clean_number <- function(x, digits = 0){
     dplyr::case_when(x >= 1e9 ~ glue("{round(x/1e9, digits)}B"),
@@ -63,6 +68,13 @@
   
   df_msd <- df_msd %>% 
     bind_rows(df_old)
+  
+  df_msd %>% 
+    filter(country %ni% exclude_cntry,
+           !str_detect(country, "Region")) %>% 
+    count(country) %>% pull(country)
+  
+  
 
 # VALIDATION -------------------------------------------------------------------
   
@@ -234,15 +246,18 @@
   df_hts_mod <-  df_msd %>% 
       filter(indicator %in% c("HTS_TST", "HTS_TST_POS"),
              country %in% include_cntry,
-           #  country %ni% c("Nigeria", "Tanzania"),
+             country %ni% c("Nigeria", "Tanzania"),
              fiscal_year %in% c(2019,2020, 2021, 2022,2023),
              standardizeddisaggregate == "Modality/Age/Sex/Result") %>% 
     # count(country)
-      group_by(fiscal_year, indicator, modality) %>% 
+      group_by(fiscal_year, indicator, target_modality_2024) %>% 
       summarise(across(starts_with("cumulative"), sum, na.rm = T), .groups = "drop") %>% 
       #  reshape_msd() %>% 
       pivot_wider(names_from = "indicator", values_from = "cumulative") %>% 
-      mutate(positivity = HTS_TST_POS/HTS_TST)
+      mutate(positivity = HTS_TST_POS/HTS_TST) %>% 
+    mutate(fill_color = case_when(target_modality_2024 == "Active Index" ~ "#9683EC",
+                                  target_modality_2024 == "TBClinic" ~ "#FFBF68",
+                                  TRUE ~ trolley_grey_light))
   
   df_msd %>% 
     filter(indicator %in% c("HTS_TST", "HTS_TST_POS"),
@@ -293,37 +308,33 @@ si_save("Images/02_modality_heatmap.png")
 nudge_space <- 0.125
 
 viz_bar <- df_hts_mod %>% 
-  filter(modality %in% c("Active Index", "TBClinic")) %>% 
+  filter(target_modality_2024 %in% c("Active Index", "TBClinic")) %>% 
   ggplot(aes(x = fiscal_year)) +
-  geom_col(aes(y = HTS_TST), width = 0.75, fill = scooter) +
- # geom_col(aes(y = HTS_TST_POS), width = 0.75, position = position_nudge(x = nudge_space), fill = scooter_med) +
- # geom_col(aes(y = `Specimen Return`), width = 0.75, position = position_nudge(x = nudge_space*2), fill = golden_sand) +
-  facet_wrap(~modality) +
+  geom_col(aes(y = HTS_TST, fill = fill_color), width = 0.75) +
+  facet_wrap(~target_modality_2024) +
+  scale_fill_identity() +
   si_style_ygrid() +
-  geom_text(aes(y = HTS_TST, label = clean_number(HTS_TST)), size = 12/.pt, hjust = 0,
-            color = scooter,
+  geom_text(aes(y = HTS_TST, label = clean_number(HTS_TST,1)), size = 12/.pt, hjust = 0.5,
+            vjust = -0.5,
+          #  color = scooter,
             family = "Source Sans Pro") +
-  # geom_text(aes(y = `Specimen Sent Xpert`, label = clean_number(`Specimen Sent Xpert`)), size = 12/.pt, hjust = 0,
-  #           color = "white",
-  #           family = "Source Sans Pro") +
-  # geom_text(aes(y = `Specimen Return`, label = clean_number(`Specimen Return`)), size = 12/.pt, hjust = 0,
-  #           color = "white",
-  #           family = "Source Sans Pro") +
   scale_y_continuous(label = label_number(scale_cut = cut_short_scale())) +
   labs(x = NULL, y = NULL,
        caption = glue("{metadata$caption}"))+
-  theme(strip.text = element_blank())
+  theme(strip.text = element_blank(),
+        axis.text.y = element_blank())
 
 
 #positivity by modality
 viz_line <- df_hts_mod %>% 
-  filter(modality %in% c("Active Index", "TBClinic")) %>% 
-  ggplot(aes(fiscal_year, positivity, group = modality, color = scooter, fill = scooter)) +
+  filter(target_modality_2024 %in% c("Active Index", "TBClinic")) %>% 
+  ggplot(aes(fiscal_year, positivity, group = target_modality_2024, color = fill_color, fill = fill_color)) +
   geom_line(alpha = .4, size = .9, position = "identity") +
   geom_point(na.rm = TRUE) +
   geom_text(aes(label = percent(positivity, 1)), na.rm = TRUE,
+            color = "black",
             hjust = .5, vjust = -0.4,family = "Source Sans Pro") +
-  facet_wrap(~modality) +
+  facet_wrap(~target_modality_2024) +
   scale_color_identity() + 
   scale_fill_identity() +
   si_style_nolines() +
@@ -333,12 +344,13 @@ viz_line <- df_hts_mod %>%
       # title = "Adults (15+) account for a higher positivity yield than pediatrics (<15) amongst index testing and HIV testing in TB Clinics" %>% toupper(),
        title = "HIV testing volume and positivity yield by Index testing and TB Clinic modality") + 
   theme(strip.text.y = element_text(angle = 0),
-        axis.text.x = element_blank())
+        axis.text.x = element_blank(),
+        axis.text.y = element_blank())
 
 viz_line / viz_bar +
   plot_layout(heights = c(1,2))
 
-si_save("Graphics/01_ias_modality_hts.svg")
+si_save("Graphics/01_ias_modality_hts_without_nga_tza.svg")
 
 # VALS FOR ABSTRACT -------------------------------------------------------------------
 
