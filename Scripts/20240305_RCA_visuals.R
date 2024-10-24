@@ -3,7 +3,7 @@
 # REF ID:   6193cd58 
 # LICENSE:  MIT
 # DATE:     2024-03-05
-# UPDATED: 
+# UPDATED: 2024-10-24
 
 # DEPENDENCIES ------------------------------------------------------------
   
@@ -36,6 +36,10 @@ data_folder <- "Data"
 df_tsr <- data_folder %>% 
   return_latest("Uganda_TSR") %>% 
   read_xlsx()
+
+df_tsr_v2 <- data_folder %>% 
+  return_latest("TSR_Email") %>% 
+  read_xlsx(sheet = "Summary", skip = 2)
 
 df_mort <- data_folder %>% 
   return_latest("Data review TBHIV Uganda LPHS") %>% 
@@ -180,27 +184,28 @@ df_death %>%
 
 si_save("Images/02_COD.png")
 
-#TSR Uganda viz
-df_tsr %>% 
-  mutate(group = 1) %>%
-  mutate(fill_color = ifelse(TSR > goal, hw_orchid_bloom, hw_midnight_blue)) %>% 
-  ggplot(aes(x = fct_reorder(timeframe, order), y = TSR,
+#TSR Uganda viz - adapted for v2
+df_tsr_v2 %>% 
+  janitor::clean_names() %>% 
+  mutate(group = 1, goal = .9) %>%
+  mutate(fill_color = ifelse(tsr > goal, hw_orchid_bloom, hw_midnight_blue)) %>% 
+  ggplot(aes(x = fct_reorder(data_element_period, order), y = tsr,
              group = group,  color = fill_color)) +
-  geom_line() +
+  geom_line(linewidth = 1) +
   geom_point(size =3) +
   geom_hline(yintercept = 0.9, color = usaid_lightgrey,
              linetype = "dashed") +
-  geom_text(aes(label = percent(TSR)), size = 12/.pt,
+  geom_text(aes(label = percent(tsr, .1)), size = 12/.pt,
             hjust = 0.5,
             vjust = -1,
             family = "Source Sans Pro") +
-  geom_text(aes(x = "Oct/Dec 2021", y = 0.9, label = "National target of 90%"),
+  geom_text(aes(x = "Jan to Mar 2022", y = 0.9, label = "National target of 90%"),
             size = 12/.pt,
             hjust = -0.2,
             vjust = -1,
             color =trolley_grey,
             family = "Source Sans Pro") +
-  geom_text(aes(x = "Jan/March 2023", y = 0.85, label = "Start of the RCA pilot"),
+  geom_text(aes(x = "Jan to Mar 2023", y = 0.85, label = "Start of the RCA pilot"),
             size = 12/.pt,
             #hjust = -0.1,
             vjust = -1.5,
@@ -212,11 +217,11 @@ df_tsr %>%
   labs(x = NULL,
        y = NULL,
        title = "TB Treatment Success Rate (TSR) in Ankole improved above 90% after the start of the RCA pilot" %>% toupper(),
-       subtitle = "Similar trends observed 2 other regions (Kampala and Acholi) that implemented the RCA pilot",
-       captionm = "Source: Ankole Regional Data
-       [For internal use only]")
+       #subtitle = "Similar trends observed 2 other regions (Kampala and Acholi) that implemented the RCA pilot",
+       captionm = "Source: Ankole Regional Data [October 2024]
+       Presented at Union Conference on Lung Health - 2024")
 
-si_save("Graphics/01_TSR.svg")
+si_save("Graphics/01_TSR_v2.svg")
 si_save("Images/01_TSR.png")
 
 # VIZ ABOUT CD4 AND VL FOR PATIENTS WHO DIED ----------------------------------
