@@ -38,6 +38,28 @@ metadata <- get_metadata(path)
 
 # MUNGE -------------------------------------------------------------------
   
+  df_cd4 <- df_msd %>% 
+    filter(indicator == "TX_RTT",
+           fiscal_year == metadata$curr_fy,
+           age_2019 %ni% c("01-04", "<01"),
+           standardizeddisaggregate == "Age/Sex/CD4/HIVStatus") %>% 
+    group_by(fiscal_year, indicator, operatingunit,
+             otherdisaggregate) %>% 
+    summarise(across(starts_with("cumulative"), sum, na.rm = T), .groups = "drop") %>% 
+    pivot_wider(names_from = "otherdisaggregate", values_from = "cumulative") %>% 
+    ungroup() %>% 
+    mutate(`<200 CD4` = ifelse(is.na(`<200 CD4`), 0, `<200 CD4`),
+           `>=200 CD4` = ifelse(is.na(`>=200 CD4`), 0, `>=200 CD4`),
+           `CD4 Unknown` = ifelse(is.na(`CD4 Unknown`), 0, `CD4 Unknown`)) %>% 
+    mutate(total = `<200 CD4`+`>=200 CD4`+`CD4 Unknown`,
+           pct_completeness = (`<200 CD4`+`>=200 CD4`) / total,
+           pct_ahd = (`<200 CD4`)/(`<200 CD4`+`>=200 CD4`)) %>% 
+    mutate(operatingunit = case_when(operatingunit == "Democratic Republic of the Congo" ~ "DRC",
+                                     operatingunit == "Dominican Republic" ~ "DR",
+                                     TRUE ~ operatingunit)) %>% 
+    mutate(pct_ahd = ifelse(`<200 CD4` == 0 & `>=200 CD4` == 0, 0, pct_ahd)) %>% 
+    filter(operatingunit != "South Sudan")
+  
   
 #FY24Q3 TX_NEW  
 df_cd4 <- df_msd %>% 
