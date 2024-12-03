@@ -3,7 +3,7 @@
 # REF ID:   0cf38479 
 # LICENSE:  MIT
 # DATE:     2023-10-31
-# UPDATED: 
+# UPDATED:  2024-11-21
 
 # DEPENDENCIES ------------------------------------------------------------
   
@@ -47,10 +47,24 @@ df_age_sex <- data_folder %>%
   return_latest("age_sex") %>% 
   read_csv()
 
-#UNAIDS 2022 Estimates
+#UNAIDS 2023 Estimates
 df_est <- pull_estimates(FALSE)
 df_tt <- pull_testtreat(FALSE)
-  
+
+# MSD
+
+df_msd_arch <- si_path() %>% 
+  return_latest("OU_IM_FY15") %>% 
+  read_psd()
+
+df_msd <- si_path() %>% 
+  return_latest("OU_IM_FY22") %>% 
+  read_psd()
+
+
+metadata_msd <-  si_path() %>% 
+  return_latest("OU_IM_FY22") %>% 
+  get_metadata()
 # FUNCTIONS -------------------------------------------------------------------
 
 #clean up country names
@@ -80,7 +94,7 @@ rename_countries <- function(df) {
 tidy_data <- function(df) {
   
  df_tidy <-  df %>% 
-   filter(year >= 2018) %>% 
+   filter(year >= 2015) %>% 
     mutate(year = as.character(year),
            iso_numeric = as.character(iso_numeric)) %>% 
    tidyr::pivot_longer(where(is.double),
@@ -97,6 +111,9 @@ tidy_data <- function(df) {
 df_cntry_clean <- df_country %>%
   rename_countries() %>% 
   tidy_data() %>% 
+  filter(indicator %in% c("e_pop_num", "e_inc_100k","e_inc_num", "e_tbhiv_prct", "e_inc_tbhiv_100k",
+                          "e_inc_tbhiv_num", "e_mort_exc_tbhiv_100k", "e_mort_exc_tbhiv_num", "e_mort_tbhiv_100k",
+                          "e_mort_tbhiv_num","e_mort_100k", "e_mort_num")) %>% 
   mutate(table_name = "TB burden countries")
 
 # #list of cols to remove from notifs df
@@ -118,8 +135,10 @@ df_cntry_clean <- df_country %>%
 df_notif_clean <- df_notif %>% 
   rename_countries() %>% 
  # select(-c(all_of(rm_cols))) %>% 
-  select(country, iso2, iso3, iso_numeric, g_whoregion, year, newrel_hivpos, newrel_hivpos_014) %>% 
+ # select(country, iso2, iso3, iso_numeric, g_whoregion, year, newrel_hivpos, newrel_hivpos_014) %>% 
   tidy_data() %>% 
+  filter(indicator %in% c("c_newinc", "hiv_new", "hiv_reg", "hiv_reg_all", "hiv_reg_new",
+                          "hivtest_pos","newrel_hivpos", "newrel_hivpos_014", "c_tbhiv_tsr", "hiv_tbscr", "hiv_tbdetect")) %>% 
   mutate(table_name = "TB notifications")
 
 
@@ -145,7 +164,7 @@ df_age_sex_clean <- df_age_sex %>%
 
 #PLHIV (adults / peds)
 df_est_tidy <- df_est %>%
-  filter(indicator %in% c("Number PLHIV"),
+  filter(indicator %in% c("Number PLHIV", "Total deaths to HIV Population"),
          sex == "All",
          age %in% c("All", "0-14"),
          year >= 2018,
@@ -155,18 +174,20 @@ df_est_tidy <- df_est %>%
 
 #clean up to get into Tableau format
 df_est_final <- df_est_tidy %>% 
-  select(-c(region, estimate_flag, sheet, indic_type, epi_control, `Achieved 95s with PLHIV base in 2022`,`Achieved 95s with relative base in 2022`)) %>% 
+  select(-c(region, estimate_flag, sheet, indic_type, epi_control,achv_95_plhiv, achv_95_relative, epi_ratio_2023)) %>% 
   tidyr::pivot_longer(where(is.double),
                       names_to = "est_type") %>% 
   mutate(est_type = case_when(est_type == "estimate" ~ "val", #remove this for the tidy data - this is just to match TB workflow
                               est_type == "lower_bound" ~ "lo",
                               est_type == "upper_bound" ~ "hi",
                               TRUE ~ est_type)) %>% 
-  mutate(indicator = "PLHIV") %>% 
+  mutate(indicator = case_when(indicator == "Number PLHIV" ~ "PLHIV",
+                               indicator == "Total deaths to HIV Population" ~ "Total_Deaths")) %>% 
+  #mutate(indicator = "PLHIV") %>% 
   unite(indicator, c(indicator, age, est_type), sep = "_", remove = FALSE) %>% 
   select(country, year, indicator, value) %>% 
   mutate(indicator = str_remove(indicator, "_val")) %>% 
-  mutate(table_name = "UNAIDS 2022 Estimates")
+  mutate(table_name = "UNAIDS 2023 Estimates")
 
 
 #PLHIV on ART, PLHIV on ART 0-14, UNAIDS PLHIV on ART %
@@ -182,7 +203,7 @@ df_tt_tidy <- df_tt %>%
   
 #clean up to get into Tableau format
 df_tt_final <- df_tt_tidy %>% 
-  select(-c(region, estimate_flag, sheet, indic_type, epi_control, `Achieved 95s with PLHIV base in 2022`,`Achieved 95s with relative base in 2022`)) %>% 
+  select(-c(region, estimate_flag, sheet, indic_type, epi_control, achv_95_plhiv, achv_95_relative, epi_ratio_2023)) %>% 
   tidyr::pivot_longer(where(is.double),
                       names_to = "est_type") %>% 
   mutate(est_type = case_when(est_type == "estimate" ~ "val", #remove this for the tidy data - this is just to match TB workflow
@@ -194,19 +215,105 @@ df_tt_final <- df_tt_tidy %>%
   unite(indicator, c(indicator, age, est_type), sep = "_", remove = FALSE) %>% 
   select(country, year, indicator, value) %>% 
   mutate(indicator = str_remove(indicator, "_val")) %>% 
-  mutate(table_name = "UNAIDS 2022 Estimates")
+  mutate(table_name = "UNAIDS 2023 Estimates")
 
 
+# MSD data ----------------------------------------------------------------
+
+# TX_CURR every year (Q1 cumulative) - all ages and <15
+# TX_TB_N cumulative - all ages and <15
+
+df_msd_combined <- df_msd %>% 
+  rbind(df_msd_arch) 
+
+# TX_CURR Q1 - <15
+txcurr_peds <- df_msd_combined %>% 
+ # resolve_knownissues()  %>% 
+  filter(fiscal_year >= 2017 & fiscal_year <= 2024,
+         indicator == "TX_CURR",
+         trendscoarse == "<15",
+         standardizeddisaggregate %in% c("Age Aggregated/Sex/HIVStatus", "Age/Sex/HIVStatus")) %>% 
+  group_by(fiscal_year, country, indicator, trendscoarse) %>% 
+  summarise(across(starts_with("qtr"), sum, na.rm = T), .groups = "drop") %>% 
+  select(-c(qtr2:qtr4)) %>% 
+  mutate(indicator = "TX_CURR <15 Q1",
+         table_name = metadata_msd$source) %>%
+  rename(value = qtr1,
+         year = fiscal_year) %>% 
+  mutate(year = year - 1) %>% 
+  select(country, year, indicator, value, table_name)
+  
+  #TX_CURR Q1 - all ages
+ txcurr_all <- df_msd_combined %>% 
+   # resolve_knownissues()  %>% 
+    filter(fiscal_year >= 2017 & fiscal_year <= 2024,
+           indicator == "TX_CURR",
+         #  trendscoarse == "<15",
+           standardizeddisaggregate %in% c("Total Numerator")) %>% 
+    group_by(fiscal_year, country, indicator) %>% 
+    summarise(across(starts_with("qtr"), sum, na.rm = T), .groups = "drop") %>% 
+    select(-c(qtr2:qtr4)) %>% 
+    mutate(indicator = "TX_CURR Q1",
+           table_name = metadata_msd$source) %>%
+    rename(value = qtr1,
+           year = fiscal_year) %>% 
+    mutate(year = year - 1) %>% 
+    select(country, year, indicator, value, table_name)
+ 
+ # TX_TB_N <15
+ tx_tb_n_peds <- df_msd_combined %>% 
+   clean_indicator() %>% 
+   # resolve_knownissues()  %>% 
+   filter(fiscal_year >= 2017,
+          indicator == "TX_TB",
+          numeratordenom == "N",
+          trendscoarse == "<15",
+          standardizeddisaggregate %in% c("Age Aggregated/Sex/NewExistingArt/HIVStatus", "Age Aggregated/Sex",
+                                          "Age/Sex/NewExistingArt/HIVStatus", "Age Aggregated/Sex/HIVStatus")) %>% 
+   group_by(fiscal_year, country, indicator, trendscoarse) %>% 
+   summarise(across(starts_with("qtr"), sum, na.rm = T), .groups = "drop") %>% 
+   select(-c(qtr1, qtr3)) %>% 
+   mutate(total = qtr2 + qtr4) %>% 
+   mutate(indicator = "TX_TB_N <15 Cumulative",
+          table_name = metadata_msd$source) %>%
+   rename(value = total,
+          year = fiscal_year) %>% 
+   select(country, year, indicator, value, table_name)
+ 
+ # TX_TB_N All ages
+ tx_tb_n_all <- df_msd_combined %>% 
+   clean_indicator() %>% 
+   # resolve_knownissues()  %>% 
+   filter(fiscal_year >= 2017,
+          indicator == "TX_TB",
+          numeratordenom == "N",
+        #  trendscoarse == "<15",
+          standardizeddisaggregate %in% c("Total Numerator")) %>% 
+   group_by(fiscal_year, country, indicator) %>% 
+   summarise(across(starts_with("qtr"), sum, na.rm = T), .groups = "drop") %>% 
+   select(-c(qtr1, qtr3)) %>% 
+   mutate(total = qtr2 + qtr4) %>% 
+   mutate(indicator = "TX_TB_N All Cumulative",
+          table_name = metadata_msd$source) %>%
+   rename(value = total,
+          year = fiscal_year) %>% 
+   select(country, year, indicator, value, table_name)
+ 
+ df_msd_clean <- bind_rows(txcurr_all, txcurr_peds, tx_tb_n_all, tx_tb_n_peds)
+ 
+
+# BIND ALL TOGETHER --------------------------------------------------------
 
 #join together
 df_who_unaids_final <- rbind(df_cntry_clean, df_notif_clean) %>% 
-  filter(indicator %in% c("e_inc_tbhiv_num", "e_inc_tbhiv_num_hi", "e_inc_tbhiv_num_lo",
-                          "e_mort_tbhiv_num", "e_mort_tbhiv_num_hi", "e_mort_tbhiv_num_lo",
-                          "newrel_hivpos", "newrel_hivpos_014", "e_inc_num", "e_inc_num_hi",
-                          "e_inc_num_lo")) %>%
+  # filter(indicator %in% c("e_inc_tbhiv_num", "e_inc_tbhiv_num_hi", "e_inc_tbhiv_num_lo",
+  #                         "e_mort_tbhiv_num", "e_mort_tbhiv_num_hi", "e_mort_tbhiv_num_lo",
+  #                         "newrel_hivpos", "newrel_hivpos_014", "e_inc_num", "e_inc_num_hi",
+  #                         "e_inc_num_lo")) %>%
   select(-c(iso3, g_whoregion)) %>% 
-  rbind(df_est_final, df_tt_final, df_age_sex_clean)
+  rbind(df_est_final, df_tt_final, df_age_sex_clean, df_msd_clean)
 
+ today <- lubridate::today()
 
-write_csv(df_who_unaids_final, "Dataout/2022_who_unaids_tb_dataset.csv")
+write_csv(df_who_unaids_final, glue::glue("Dataout/2024_who_unaids_tb_dataset_v3_{today}.csv"))
   
